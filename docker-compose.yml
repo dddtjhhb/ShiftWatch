@@ -1,0 +1,61 @@
+# docker compose up --build                 -> API on :8000, 2 workers, mock provider
+# docker compose --profile ollama up        -> also start a local Ollama on :11434
+x-service-env: &service-env
+  SHIFTWATCH_DATABASE_URL: postgresql://shiftwatch:shiftwatch@postgres:5432/shiftwatch
+  SHIFTWATCH_PROVIDER_CONCURRENCY: "4"
+  SHIFTWATCH_LEASE_SECONDS: "30"
+  SHIFTWATCH_MAX_PENDING_TASKS: "20000"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: shiftwatch
+      POSTGRES_PASSWORD: shiftwatch
+      POSTGRES_DB: shiftwatch
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shiftwatch"]
+      interval: 2s
+      retries: 30
+
+  migrate:
+    build: .
+    command: ["python", "-m", "shiftwatch.service", "migrate"]
+    environment: *service-env
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  api:
+    build: .
+    command: ["python", "-m", "shiftwatch.service", "api"]
+    environment: *service-env
+    ports: ["8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  worker:
+    build: .
+    command: ["python", "-m", "shiftwatch.service", "worker", "--slots", "4"]
+    environment: *service-env
+    deploy: {replicas: 2}
+    stop_grace_period: 60s   # SIGTERM lets in-flight tasks commit
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  mock-provider:
+    build: .
+    command: ["python", "-m", "shiftwatch.service", "mock-provider", "--port", "11500",
+              "--latency-ms", "200", "--error-rate", "0.05", "--max-concurrency", "8",
+              "--dataset", "datasets/llm_benchmark_60.jsonl"]
+    ports: ["11500:11500"]
+
+  ollama:
+    image: ollama/ollama
+    profiles: [ollama]
+    ports: ["11434:11434"]
+    volumes: [ollama:/root/.ollama]
+
+volumes:
+  pgdata:
+  ollama:

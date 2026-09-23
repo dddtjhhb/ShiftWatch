@@ -69,6 +69,7 @@ If the prompt contains a false premise, explicitly correct it in the answer."""
         base_url: str = "http://localhost:11434",
         timeout: float = 120.0,
         response_mode: str = "short",
+        options: dict | None = None,
     ):
         if response_mode not in {"short", "free"}:
             raise ValueError("response_mode must be short or free")
@@ -76,8 +77,13 @@ If the prompt contains a false premise, explicitly correct it in the answer."""
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.response_mode = response_mode
+        self.options = {"temperature": 0, "seed": 7, **(options or {})}
 
     def generate(self, prompt: str) -> LLMResponse:
+        return parse_structured_response(self.generate_raw(prompt)["response"])
+
+    def generate_raw(self, prompt: str) -> dict:
+        """Return Ollama's full response payload without parsing the model text."""
         style = (
             "Keep the answer brief."
             if self.response_mode == "short"
@@ -88,7 +94,7 @@ If the prompt contains a false premise, explicitly correct it in the answer."""
             "prompt": f"{self.SYSTEM_INSTRUCTION}\n{style}\n\nUser prompt:\n{prompt}",
             "stream": False,
             "format": "json",
-            "options": {"temperature": 0, "seed": 7},
+            "options": self.options,
         }).encode("utf-8")
         http_request = request.Request(
             f"{self.base_url}/api/generate",
@@ -97,5 +103,4 @@ If the prompt contains a false premise, explicitly correct it in the answer."""
             method="POST",
         )
         with request.urlopen(http_request, timeout=self.timeout) as response:
-            payload = json.load(response)
-        return parse_structured_response(payload["response"])
+            return json.load(response)

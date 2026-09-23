@@ -9,8 +9,22 @@ description = "Reproducible evaluation and monitoring of model reliability under
 requires-python = ">=3.10"
 license = {text = "MIT"}
 
+[project.optional-dependencies]
+service = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "psycopg[binary]>=3.2",
+]
+test = ["httpx>=0.27"]
+
 [project.scripts]
 shiftwatch = "shiftwatch.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["shiftwatch*"]
+
+[tool.setuptools.package-data]
+"shiftwatch.service" = ["migrations/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

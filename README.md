@@ -62,6 +62,26 @@ python -m shiftwatch.cli llm-evaluate datasets/llm_benchmark_60.jsonl \
 
 The same adapter boundary can later point to an Ollama server running on a university GPU node. Cluster access, job scheduling, and model storage depend on the account and allocation supplied by the university, course, or research group.
 
+## Evaluation service (recoverable, traceable, concurrent)
+
+**Integration status:** the supplied service patch is integrated locally. Core tests pass, but PostgreSQL integration and fault experiments have not been rerun in this environment. Recovery/concurrency claims below describe the intended design; see [integration issues](docs/service_integration_issues.md) for known gaps before relying on them.
+
+The batch commands above run in a single process. `shiftwatch.service` runs the same LLM evaluation as a small backend system: a FastAPI server plus independent worker processes, with PostgreSQL holding immutable dataset/model-config versions, the task queue, every execution attempt, write-once model outputs, and versioned scoring runs. Workers hold time-limited leases with heartbeats. If a worker crashes, its tasks are requeued. A stale worker cannot overwrite a newer result. A global per-provider concurrency cap, queue-capacity backpressure (HTTP 429) and fair-share scheduling keep one large experiment from overloading the model server or starving small ones. Re-scoring with a revised rubric reads stored outputs and never calls the model.
+
+```bash
+docker compose up --build          # API :8000, 2 workers, Postgres, fault-injecting mock provider
+python -m shiftwatch.service client submit datasets/llm_benchmark_60.jsonl \
+  --model mock --base-url http://mock-provider:11500 --wait
+python -m shiftwatch.service client score RUN_ID --overrides revised_terms.json
+# Real model: docker compose --profile ollama up, then --model llama3:latest --base-url http://ollama:11434
+```
+
+Without Docker: `pip install -e '.[service]'`, set `SHIFTWATCH_DATABASE_URL`, then run `python -m shiftwatch.service migrate`, `... api`, `... worker --slots 4`. Interactive API docs are served at `/docs`.
+
+The supplied patch includes a crash-recovery and performance report. Those measurements have not been independently reproduced here and must not be presented as newly verified results. External calls may be repeated after failures; the database is intended to accept at most one effective output per task. See [`docs/service_design.md`](docs/service_design.md) for the design and supplied experiments.
+
+Integration tests need a throwaway PostgreSQL database: `SHIFTWATCH_TEST_DATABASE_URL=postgresql://... python -m unittest tests.test_service`. They are skipped when that variable is unset.
+
 ## Code-agent evaluation
 
 The `code-evaluate` command accepts a compact HumanEval/MBPP-style JSONL contract: task id, prompt, entry point, executable assertions, a task-specific false premise, and optional deterministic fixture candidates. Each task is evaluated under four conditions and can be repeated to measure run-to-run stability:
