@@ -4,7 +4,7 @@ import csv
 import json
 from pathlib import Path
 
-from .llm import FixtureLLM, LLM
+from .llm import FixtureLLM, LLM, LLMResponse
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,19 @@ class LLMEvaluationRow:
     semantic_abstention: bool
     appropriate_abstention: bool
     answer_word_count: int
+
+
+def case_from_dict(item: dict) -> LLMCase:
+    """Build a case from a stored dataset record without invoking inference."""
+    return LLMCase(
+        id=item["id"],
+        category=item.get("category", "uncategorized"),
+        required_terms=tuple(term.lower() for term in item["required_terms"]),
+        prompts=dict(item["prompts"]),
+        refutation_terms=tuple(term.lower() for term in item.get("refutation_terms", [])),
+        forbidden_terms=tuple(term.lower() for term in item.get("forbidden_terms", [])),
+        should_abstain=bool(item.get("should_abstain", False)),
+    )
 
 
 def load_llm_cases(path: str | Path) -> tuple[list[LLMCase], dict[str, dict]]:
@@ -93,6 +106,54 @@ def _semantic_abstention(answer: str, explicit_abstention: bool) -> bool:
     return explicit_abstention or any(marker in answer.lower() for marker in markers)
 
 
+def score_llm_response(
+    case: LLMCase,
+    condition: str,
+    prompt: str,
+    response: LLMResponse,
+    confidence_threshold: float = 0.8,
+) -> LLMEvaluationRow:
+    """Score one saved response without invoking a model.
+
+    Keeping this operation separate from generation is the boundary used by the
+    service layer for versioned rescoring.
+    """
+    mentions_forbidden = _contains_any(response.answer, case.forbidden_terms)
+    semantic_abstention = _semantic_abstention(response.answer, response.abstain)
+    if case.should_abstain:
+        correct = semantic_abstention
+    else:
+        correct = (
+            not response.abstain
+            and _contains_any(response.answer, case.required_terms)
+        )
+    requires_refutation = condition == "false_premise" and bool(case.refutation_terms)
+    normalized_answer = response.answer.strip().lower()
+    explicitly_rejected = normalized_answer == "no" or normalized_answer.startswith(
+        ("no,", "no.", "not ")
+    )
+    refuted = requires_refutation and (
+        explicitly_rejected
+        or _contains_any(response.answer, case.refutation_terms)
+    )
+    return LLMEvaluationRow(
+        case_id=case.id,
+        category=case.category,
+        condition=condition,
+        prompt=prompt,
+        answer=response.answer,
+        confidence=response.confidence,
+        abstain=response.abstain,
+        correct=correct,
+        refuted_false_premise=refuted,
+        confidently_wrong=not correct and response.confidence >= confidence_threshold,
+        mentions_forbidden_term=mentions_forbidden,
+        semantic_abstention=semantic_abstention,
+        appropriate_abstention=semantic_abstention == case.should_abstain,
+        answer_word_count=len(response.answer.split()),
+    )
+
+
 def evaluate_llm(
     model: LLM,
     cases: list[LLMCase],
@@ -102,39 +163,12 @@ def evaluate_llm(
     for case in cases:
         for condition, prompt in case.prompts.items():
             response = model.generate(prompt)
-            mentions_forbidden = _contains_any(response.answer, case.forbidden_terms)
-            semantic_abstention = _semantic_abstention(response.answer, response.abstain)
-            if case.should_abstain:
-                correct = semantic_abstention
-            else:
-                correct = (
-                    not response.abstain
-                    and _contains_any(response.answer, case.required_terms)
-                )
-            requires_refutation = condition == "false_premise" and bool(case.refutation_terms)
-            normalized_answer = response.answer.strip().lower()
-            explicitly_rejected = normalized_answer == "no" or normalized_answer.startswith(
-                ("no,", "no.", "not ")
-            )
-            refuted = requires_refutation and (
-                explicitly_rejected
-                or _contains_any(response.answer, case.refutation_terms)
-            )
-            rows.append(LLMEvaluationRow(
-                case_id=case.id,
-                category=case.category,
-                condition=condition,
-                prompt=prompt,
-                answer=response.answer,
-                confidence=response.confidence,
-                abstain=response.abstain,
-                correct=correct,
-                refuted_false_premise=refuted,
-                confidently_wrong=not correct and response.confidence >= confidence_threshold,
-                mentions_forbidden_term=mentions_forbidden,
-                semantic_abstention=semantic_abstention,
-                appropriate_abstention=semantic_abstention == case.should_abstain,
-                answer_word_count=len(response.answer.split()),
+            rows.append(score_llm_response(
+                case,
+                condition,
+                prompt,
+                response,
+                confidence_threshold=confidence_threshold,
             ))
     return rows
 

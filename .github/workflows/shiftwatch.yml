@@ -7,6 +7,8 @@ on:
       - "tests/**"
       - "datasets/**"
       - "pyproject.toml"
+      - "docker-compose.yml"
+      - "Dockerfile"
       - ".github/workflows/shiftwatch.yml"
   pull_request:
     paths:
@@ -14,6 +16,8 @@ on:
       - "tests/**"
       - "datasets/**"
       - "pyproject.toml"
+      - "docker-compose.yml"
+      - "Dockerfile"
       - ".github/workflows/shiftwatch.yml"
   workflow_dispatch:
     inputs:
@@ -52,8 +56,33 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Run tests
+      - name: Run core tests
         run: python -m unittest discover -v
+
+  service-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shiftwatch_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      SHIFTWATCH_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/shiftwatch_test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install service extras
+        run: pip install -e '.[service,test]'
+      - name: Run service integration tests
+        run: python -m unittest tests.test_service -v
 
   run:
     if: github.event_name == 'workflow_dispatch'

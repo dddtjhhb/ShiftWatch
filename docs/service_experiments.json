@@ -1,0 +1,170 @@
+{
+  "crash_recovery": {
+    "setup": "240 tasks, mock 300\u00b160 ms, provider cap 8, 2 workers x 4 slots, lease 3 s; SIGKILL one worker after 96 outputs, start a replacement immediately",
+    "trials": [
+      {
+        "trial": 0,
+        "tasks": 240,
+        "orphaned_running_at_kill": 4,
+        "recovery_s": 4.58,
+        "status": "succeeded",
+        "makespan_s": 11.59,
+        "succeeded": 240,
+        "failed": 0,
+        "lost_tasks": 0,
+        "duplicate_effective_results": 0,
+        "attempt_outcomes": {
+          "lease_expired": 4,
+          "succeeded": 240
+        },
+        "queue_wait_p50_s": 5.28,
+        "queue_wait_p95_s": 10.88,
+        "provider_calls": 244,
+        "extra_provider_calls": 4
+      },
+      {
+        "trial": 1,
+        "tasks": 240,
+        "orphaned_running_at_kill": 4,
+        "recovery_s": 4.67,
+        "status": "succeeded",
+        "makespan_s": 11.7,
+        "succeeded": 240,
+        "failed": 0,
+        "lost_tasks": 0,
+        "duplicate_effective_results": 0,
+        "attempt_outcomes": {
+          "succeeded": 240,
+          "lease_expired": 4
+        },
+        "queue_wait_p50_s": 5.24,
+        "queue_wait_p95_s": 10.94,
+        "provider_calls": 244,
+        "extra_provider_calls": 4
+      },
+      {
+        "trial": 2,
+        "tasks": 240,
+        "orphaned_running_at_kill": 4,
+        "recovery_s": 4.61,
+        "status": "succeeded",
+        "makespan_s": 11.81,
+        "succeeded": 240,
+        "failed": 0,
+        "lost_tasks": 0,
+        "duplicate_effective_results": 0,
+        "attempt_outcomes": {
+          "lease_expired": 4,
+          "succeeded": 240
+        },
+        "queue_wait_p50_s": 5.49,
+        "queue_wait_p95_s": 11.1,
+        "provider_calls": 244,
+        "extra_provider_calls": 4
+      }
+    ]
+  },
+  "scaling": {
+    "setup": "240 tasks, mock 200\u00b140 ms with 3% HTTP 500, provider cap 64 (not binding), N workers x 4 slots",
+    "results": [
+      {
+        "workers": 1,
+        "slots_total": 4,
+        "status": "succeeded",
+        "makespan_s": 12.47,
+        "succeeded": 240,
+        "failed": 0,
+        "lost_tasks": 0,
+        "duplicate_effective_results": 0,
+        "attempt_outcomes": {
+          "retryable_error": 2,
+          "succeeded": 240
+        },
+        "queue_wait_p50_s": 5.99,
+        "queue_wait_p95_s": 11.61,
+        "throughput_tasks_per_s": 19.2,
+        "db_commits_per_task": 3.6,
+        "attempt_error_rate": 0.008,
+        "max_in_flight_at_provider": 4
+      },
+      {
+        "workers": 2,
+        "slots_total": 8,
+        "status": "succeeded",
+        "makespan_s": 6.43,
+        "succeeded": 240,
+        "failed": 0,
+        "lost_tasks": 0,
+        "duplicate_effective_results": 0,
+        "attempt_outcomes": {
+          "retryable_error": 2,
+          "succeeded": 240
+        },
+        "queue_wait_p50_s": 3.09,
+        "queue_wait_p95_s": 5.85,
+        "throughput_tasks_per_s": 37.3,
+        "db_commits_per_task": 3.1,
+        "attempt_error_rate": 0.008,
+        "max_in_flight_at_provider": 8
+      },
+      {
+        "workers": 4,
+        "slots_total": 16,
+        "status": "succeeded",
+        "makespan_s": 4.26,
+        "succeeded": 240,
+        "failed": 0,
+        "lost_tasks": 0,
+        "duplicate_effective_results": 0,
+        "attempt_outcomes": {
+          "retryable_error": 2,
+          "succeeded": 240
+        },
+        "queue_wait_p50_s": 1.9,
+        "queue_wait_p95_s": 3.33,
+        "throughput_tasks_per_s": 56.3,
+        "db_commits_per_task": 3.4,
+        "attempt_error_rate": 0.008,
+        "max_in_flight_at_provider": 16
+      }
+    ]
+  },
+  "fairness": {
+    "setup": "big run (240 tasks) then small run (16 tasks) 1 s later; 1 worker x 8 slots; mock returns 429 above 4 concurrent requests",
+    "results": [
+      {
+        "scheduler": "fifo",
+        "provider_cap": 4,
+        "small_run_makespan_s": 12.29,
+        "small_queue_wait_p95_s": 12.01,
+        "big_run_makespan_s": 12.51,
+        "provider_429s": 0,
+        "retryable_attempts": 0,
+        "max_in_flight_at_provider": 4,
+        "failed_tasks": 0
+      },
+      {
+        "scheduler": "fair",
+        "provider_cap": 4,
+        "small_run_makespan_s": 1.82,
+        "small_queue_wait_p95_s": 1.55,
+        "big_run_makespan_s": 13.3,
+        "provider_429s": 0,
+        "retryable_attempts": 0,
+        "max_in_flight_at_provider": 4,
+        "failed_tasks": 0
+      },
+      {
+        "scheduler": "fair",
+        "provider_cap": 16,
+        "small_run_makespan_s": 7.79,
+        "small_queue_wait_p95_s": 0.1,
+        "big_run_makespan_s": 13.15,
+        "provider_429s": 1526,
+        "retryable_attempts": 1526,
+        "max_in_flight_at_provider": 5,
+        "failed_tasks": 31
+      }
+    ]
+  }
+}
