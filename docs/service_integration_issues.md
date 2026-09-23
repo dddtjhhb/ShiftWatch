@@ -25,3 +25,16 @@ The supplied `service_experiments.json` and numerical tables are retained for pr
 ## Acceptance steps
 
 Run PostgreSQL integration tests in a dedicated disposable database (the suite truncates its service tables), address the findings above with regression cases, then reproduce fault/scaling experiments and record fresh environment metadata. Finally run one real Ollama end-to-end evaluation and rescore its saved outputs.
+
+## Resolution of findings (follow-up patch)
+
+Each fix has a regression test in `tests/test_service.py`. The two bugs (2 and 5) and the scheduling gaps (4 and 6) were first reproduced as failing tests against the previous code.
+
+1. **Expired lease before reaping. Kept by design and now documented.** The lease token is the fencing mechanism. Until the reaper moves the task on, no other attempt can hold it, so the original holder's result is the only possible one and accepting it avoids paying for a second call. After reaping, the old token is rejected everywhere. Test: `test_completion_after_expiry_but_before_reap_is_accepted` together with `test_stale_worker_cannot_overwrite_new_attempt`.
+2. **Cancelled runs stranding retry tasks. Fixed.** A retryable failure or a lease expiry on a cancelled run now moves the task to `cancelled`, and the run finalises. Tests: `test_cancel_then_retryable_failure_does_not_hang_run` and `test_cancel_then_lease_expiry_does_not_hang_run`.
+3. **Provider cap vs live remote calls. Documented as a boundary.** The cap counts leases. A request whose worker lost its lease may still be running at the provider while the task is reassigned. See the "Global provider cap" bullet in `docs/service_design.md`. Enforcing this fully would need cancellable HTTP calls or a provider-side limit.
+4. **Candidate window hiding other providers. Fixed.** Candidates are now ranked per provider (up to 10 each) instead of taking 25 globally. Test: `test_saturated_provider_does_not_hide_other_providers`.
+5. **Opposite lock order in cancel. Fixed. It was a real deadlock.** The claim-vs-cancel interleaving raised `DeadlockDetected`. Cancel now commits its flag in a separate transaction, then cancels tasks and finalises in task → run order, the same order every other path uses. Test: `test_cancel_does_not_deadlock_with_concurrent_claim`.
+6. **Fairness at capacity one. Improved, still documented as a heuristic.** With a cap of 1, ties always went to the oldest run. Migration `002_run_last_claimed.sql` adds `last_claimed_at`, and the fair scheduler breaks ties by least-recently-served. Test: `test_fair_scheduler_round_robins_at_capacity_one`. Strict priority can still starve lower priority, and candidate snapshots can go stale under concurrent claims; `service_design.md` says so.
+
+Validation in the sandbox (Linux, Python 3.11, PostgreSQL 16): 51 tests passed, run three times. The experiments were rerun after these changes and `docs/service_experiments.json` was regenerated. Still pending: reproduction on the author's machine, a green CI run, and one real Ollama end-to-end run.
