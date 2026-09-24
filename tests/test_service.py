@@ -189,6 +189,70 @@ class LeaseTests(ServiceTestCase):
         self.assertEqual(repository.get_run(self.conn, run["id"])["status"], "cancelled")
 
 
+    def test_cancel_then_retryable_failure_does_not_hang_run(self):
+        run = self.submit(max_cases=1, conditions=("clean",))
+        lease = self.claim()
+        queue.cancel_run(self.conn, run["id"])
+        self.assertEqual(queue.fail_task(self.conn, lease, "timeout", "t", True, 0, 0), "cancelled")
+        self.assertEqual(repository.get_run(self.conn, run["id"])["status"], "cancelled")
+
+    def test_cancel_then_lease_expiry_does_not_hang_run(self):
+        run = self.submit(max_cases=1, conditions=("clean",))
+        self.claim()
+        queue.cancel_run(self.conn, run["id"])
+        self.conn.execute("UPDATE inference_tasks SET lease_expires_at = now() - interval '1 second'")
+        self.conn.commit()
+        self.assertEqual(queue.reap_expired_leases(self.conn), 1)
+        self.assertEqual(repository.get_run(self.conn, run["id"])["status"], "cancelled")
+
+
+    def test_completion_after_expiry_but_before_reap_is_accepted(self):
+        # The lease token is the fencing authority: until the reaper hands the task to
+        # someone else, the original holder is still the only possible writer.
+        self.submit(max_cases=1, conditions=("clean",))
+        lease = self.claim()
+        self.conn.execute("UPDATE inference_tasks SET lease_expires_at = now() - interval '1 second'")
+        self.conn.commit()
+        self.assertTrue(queue.complete_task(self.conn, lease, self.output()))
+        self.assertEqual(queue.reap_expired_leases(self.conn), 0)
+        self.assertEqual(self.conn.execute("SELECT count(*) AS n FROM model_outputs").fetchone()["n"], 1)
+
+    def test_cancel_does_not_deadlock_with_concurrent_claim(self):
+        # A claim locks a task and then the run row; cancel must not lock them in the
+        # opposite order. Reproduce the interleaving deterministically.
+        run = self.submit(max_cases=1)
+        claimer = connect(DB_URL)
+        try:
+            task = claimer.execute(
+                "SELECT id FROM inference_tasks WHERE status = 'queued' ORDER BY id"
+                " FOR UPDATE LIMIT 1").fetchone()
+            errors = []
+
+            def cancel():
+                conn = connect(DB_URL)
+                try:
+                    queue.cancel_run(conn, run["id"])
+                except Exception as error:  # noqa: BLE001
+                    errors.append(error)
+                finally:
+                    conn.close()
+
+            thread = threading.Thread(target=cancel)
+            thread.start()
+            time.sleep(0.5)  # let cancel reach its task-lock wait
+            claimer.execute(
+                "UPDATE inference_runs SET status = 'running' WHERE id = %s AND status = 'queued'",
+                (run["id"],))
+            claimer.execute("UPDATE inference_tasks SET status = 'running', lease_token = gen_random_uuid()"
+                            " WHERE id = %s", (task["id"],))
+            claimer.commit()
+            thread.join(10)
+            self.assertEqual(errors, [])
+            self.assertFalse(thread.is_alive())
+        finally:
+            claimer.close()
+
+
 class ConcurrencyTests(ServiceTestCase):
     def test_provider_cap_is_global_across_connections(self):
         self.submit(provider="ollama", params={"model": "m", "base_url": "http://p"})
@@ -236,6 +300,28 @@ class ConcurrencyTests(ServiceTestCase):
         runs = [self.claim(f"w{i}").run_id for i in range(4)]
         self.assertEqual(runs.count(big["id"]), 2)
         self.assertEqual(runs.count(small["id"]), 2)
+
+    def test_saturated_provider_does_not_hide_other_providers(self):
+        repository.set_provider_limit(self.conn, "ollama:http://busy", 1)
+        for i in range(30):
+            self.submit(cases=load_jsonl("llm_demo.jsonl")[:1], provider="ollama",
+                        params={"model": f"m{i}", "base_url": "http://busy"}, priority=5)
+        self.assertIsNotNone(self.claim("a"))  # takes the busy provider's only slot
+        other = self.submit(max_cases=1)       # fixture provider, lower priority
+        self.assertEqual(self.claim("b").run_id, other["id"])
+
+    def test_fair_scheduler_round_robins_at_capacity_one(self):
+        first = self.submit()
+        dataset = repository.create_dataset_version(self.conn, "second", load_jsonl("llm_demo.jsonl")[:1])
+        second, _ = repository.submit_run(self.conn, repository.RunRequest(
+            dataset_version_id=dataset["id"], provider="fixture", params={}), self.settings)
+        repository.set_provider_limit(self.conn, "fixture", 1)
+        served = []
+        for _ in range(4):
+            lease = self.claim()
+            served.append(lease.run_id)
+            queue.complete_task(self.conn, lease, self.output())
+        self.assertEqual(served, [first["id"], second["id"], first["id"], second["id"]])
 
     def test_priority_beats_fairness(self):
         self.submit()

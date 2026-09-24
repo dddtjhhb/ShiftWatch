@@ -6,9 +6,9 @@
         "trial": 0,
         "tasks": 240,
         "orphaned_running_at_kill": 4,
-        "recovery_s": 4.58,
+        "recovery_s": 4.63,
         "status": "succeeded",
-        "makespan_s": 11.59,
+        "makespan_s": 11.72,
         "succeeded": 240,
         "failed": 0,
         "lost_tasks": 0,
@@ -17,8 +17,8 @@
           "lease_expired": 4,
           "succeeded": 240
         },
-        "queue_wait_p50_s": 5.28,
-        "queue_wait_p95_s": 10.88,
+        "queue_wait_p50_s": 5.37,
+        "queue_wait_p95_s": 11.0,
         "provider_calls": 244,
         "extra_provider_calls": 4
       },
@@ -28,27 +28,7 @@
         "orphaned_running_at_kill": 4,
         "recovery_s": 4.67,
         "status": "succeeded",
-        "makespan_s": 11.7,
-        "succeeded": 240,
-        "failed": 0,
-        "lost_tasks": 0,
-        "duplicate_effective_results": 0,
-        "attempt_outcomes": {
-          "succeeded": 240,
-          "lease_expired": 4
-        },
-        "queue_wait_p50_s": 5.24,
-        "queue_wait_p95_s": 10.94,
-        "provider_calls": 244,
-        "extra_provider_calls": 4
-      },
-      {
-        "trial": 2,
-        "tasks": 240,
-        "orphaned_running_at_kill": 4,
-        "recovery_s": 4.61,
-        "status": "succeeded",
-        "makespan_s": 11.81,
+        "makespan_s": 11.78,
         "succeeded": 240,
         "failed": 0,
         "lost_tasks": 0,
@@ -57,8 +37,28 @@
           "lease_expired": 4,
           "succeeded": 240
         },
-        "queue_wait_p50_s": 5.49,
-        "queue_wait_p95_s": 11.1,
+        "queue_wait_p50_s": 5.31,
+        "queue_wait_p95_s": 11.01,
+        "provider_calls": 244,
+        "extra_provider_calls": 4
+      },
+      {
+        "trial": 2,
+        "tasks": 240,
+        "orphaned_running_at_kill": 4,
+        "recovery_s": 4.59,
+        "status": "succeeded",
+        "makespan_s": 11.78,
+        "succeeded": 240,
+        "failed": 0,
+        "lost_tasks": 0,
+        "duplicate_effective_results": 0,
+        "attempt_outcomes": {
+          "lease_expired": 4,
+          "succeeded": 240
+        },
+        "queue_wait_p50_s": 5.43,
+        "queue_wait_p95_s": 11.05,
         "provider_calls": 244,
         "extra_provider_calls": 4
       }
@@ -71,7 +71,7 @@
         "workers": 1,
         "slots_total": 4,
         "status": "succeeded",
-        "makespan_s": 12.47,
+        "makespan_s": 12.61,
         "succeeded": 240,
         "failed": 0,
         "lost_tasks": 0,
@@ -80,9 +80,9 @@
           "retryable_error": 2,
           "succeeded": 240
         },
-        "queue_wait_p50_s": 5.99,
-        "queue_wait_p95_s": 11.61,
-        "throughput_tasks_per_s": 19.2,
+        "queue_wait_p50_s": 6.1,
+        "queue_wait_p95_s": 11.72,
+        "throughput_tasks_per_s": 19.0,
         "db_commits_per_task": 3.6,
         "attempt_error_rate": 0.008,
         "max_in_flight_at_provider": 4
@@ -91,7 +91,7 @@
         "workers": 2,
         "slots_total": 8,
         "status": "succeeded",
-        "makespan_s": 6.43,
+        "makespan_s": 6.49,
         "succeeded": 240,
         "failed": 0,
         "lost_tasks": 0,
@@ -100,9 +100,9 @@
           "retryable_error": 2,
           "succeeded": 240
         },
-        "queue_wait_p50_s": 3.09,
-        "queue_wait_p95_s": 5.85,
-        "throughput_tasks_per_s": 37.3,
+        "queue_wait_p50_s": 3.13,
+        "queue_wait_p95_s": 5.94,
+        "throughput_tasks_per_s": 37.0,
         "db_commits_per_task": 3.1,
         "attempt_error_rate": 0.008,
         "max_in_flight_at_provider": 8
@@ -111,19 +111,19 @@
         "workers": 4,
         "slots_total": 16,
         "status": "succeeded",
-        "makespan_s": 4.26,
+        "makespan_s": 3.84,
         "succeeded": 240,
         "failed": 0,
         "lost_tasks": 0,
         "duplicate_effective_results": 0,
         "attempt_outcomes": {
-          "retryable_error": 2,
-          "succeeded": 240
+          "succeeded": 240,
+          "retryable_error": 2
         },
-        "queue_wait_p50_s": 1.9,
-        "queue_wait_p95_s": 3.33,
-        "throughput_tasks_per_s": 56.3,
-        "db_commits_per_task": 3.4,
+        "queue_wait_p50_s": 1.84,
+        "queue_wait_p95_s": 3.25,
+        "throughput_tasks_per_s": 62.5,
+        "db_commits_per_task": 2.8,
         "attempt_error_rate": 0.008,
         "max_in_flight_at_provider": 16
       }
@@ -135,9 +135,9 @@
       {
         "scheduler": "fifo",
         "provider_cap": 4,
-        "small_run_makespan_s": 12.29,
-        "small_queue_wait_p95_s": 12.01,
-        "big_run_makespan_s": 12.51,
+        "small_run_makespan_s": 12.34,
+        "small_queue_wait_p95_s": 12.06,
+        "big_run_makespan_s": 12.57,
         "provider_429s": 0,
         "retryable_attempts": 0,
         "max_in_flight_at_provider": 4,
@@ -146,9 +146,9 @@
       {
         "scheduler": "fair",
         "provider_cap": 4,
-        "small_run_makespan_s": 1.82,
-        "small_queue_wait_p95_s": 1.55,
-        "big_run_makespan_s": 13.3,
+        "small_run_makespan_s": 1.87,
+        "small_queue_wait_p95_s": 1.52,
+        "big_run_makespan_s": 13.39,
         "provider_429s": 0,
         "retryable_attempts": 0,
         "max_in_flight_at_provider": 4,
@@ -157,13 +157,13 @@
       {
         "scheduler": "fair",
         "provider_cap": 16,
-        "small_run_makespan_s": 7.79,
-        "small_queue_wait_p95_s": 0.1,
-        "big_run_makespan_s": 13.15,
-        "provider_429s": 1526,
-        "retryable_attempts": 1526,
-        "max_in_flight_at_provider": 5,
-        "failed_tasks": 31
+        "small_run_makespan_s": 8.48,
+        "small_queue_wait_p95_s": 0.08,
+        "big_run_makespan_s": 13.1,
+        "provider_429s": 1418,
+        "retryable_attempts": 1418,
+        "max_in_flight_at_provider": 6,
+        "failed_tasks": 24
       }
     ]
   }

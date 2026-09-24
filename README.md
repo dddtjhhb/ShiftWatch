@@ -64,7 +64,7 @@ The same adapter boundary can later point to an Ollama server running on a unive
 
 ## Evaluation service (recoverable, traceable, concurrent)
 
-**Integration status:** the supplied service patch is integrated locally. Core tests pass, but PostgreSQL integration and fault experiments have not been rerun in this environment. Recovery/concurrency claims below describe the intended design; see [integration issues](docs/service_integration_issues.md) for known gaps before relying on them.
+**Integration status:** the six review findings in [integration issues](docs/service_integration_issues.md) have been addressed with regression tests. The PostgreSQL integration tests (51 tests) and the fault/scaling/fairness experiments were run in a separate Linux sandbox (Python 3.11, PostgreSQL 16) and have not yet been reproduced on the author's machine or in CI. No real-model (Ollama) run through the service has been done yet.
 
 The batch commands above run in a single process. `shiftwatch.service` runs the same LLM evaluation as a small backend system: a FastAPI server plus independent worker processes, with PostgreSQL holding immutable dataset/model-config versions, the task queue, every execution attempt, write-once model outputs, and versioned scoring runs. Workers hold time-limited leases with heartbeats. If a worker crashes, its tasks are requeued. A stale worker cannot overwrite a newer result. A global per-provider concurrency cap, queue-capacity backpressure (HTTP 429) and fair-share scheduling keep one large experiment from overloading the model server or starving small ones. Re-scoring with a revised rubric reads stored outputs and never calls the model.
 
@@ -78,7 +78,7 @@ python -m shiftwatch.service client score RUN_ID --overrides revised_terms.json
 
 Without Docker: `pip install -e '.[service]'`, set `SHIFTWATCH_DATABASE_URL`, then run `python -m shiftwatch.service migrate`, `... api`, `... worker --slots 4`. Interactive API docs are served at `/docs`.
 
-The supplied patch includes a crash-recovery and performance report. Those measurements have not been independently reproduced here and must not be presented as newly verified results. External calls may be repeated after failures; the database is intended to accept at most one effective output per task. See [`docs/service_design.md`](docs/service_design.md) for the design and supplied experiments.
+In the sandbox crash tests (SIGKILL of a worker mid-run, 3 trials), no tasks were lost and no task got a duplicate effective result. The killed worker's in-flight requests were sent to the provider a second time, as expected: external calls are at-least-once, and only the stored result is exactly-once. All numbers come from a mock provider and measure the scheduler, not LLM speed. Reproduce them with `scripts/service_experiments.py` before citing them. See [`docs/service_design.md`](docs/service_design.md) for the design and experiments.
 
 Integration tests need a throwaway PostgreSQL database: `SHIFTWATCH_TEST_DATABASE_URL=postgresql://... python -m unittest tests.test_service`. They are skipped when that variable is unset.
 
